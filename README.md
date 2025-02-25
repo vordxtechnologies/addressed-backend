@@ -1,4 +1,4 @@
-# Addressed FastAPI Backend
+***# Addressed FastAPI Backend
 
 ## Overview
 The **Addressed FastAPI Backend** is a high-performance API framework built with **FastAPI**, designed to handle authentication, AI processing, and data integration. It leverages **Firestore, ChromaDB, Redis, Celery, and external APIs** to ensure scalability, efficiency, and extensibility.
@@ -97,7 +97,8 @@ addressed-fastapi/
 
 2. Create a virtual environment and activate it:
    ```bash
- source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. Install dependencies:
@@ -107,7 +108,6 @@ addressed-fastapi/
 
 4. Configure environment variables in `.env`:
    ```ini
-   
    FIREBASE_API_KEY=your_firebase_api_key
    FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
    FIREBASE_PROJECT_ID=your_firebase_project_id
@@ -126,10 +126,7 @@ addressed-fastapi/
    uvicorn app.main:app --reload
    ```
 
-6. Start the Celery worker for background tasks:
-   ```bash
-   celery -A app.workers.celery.celery_app worker --loglevel=info
-   ```
+
 
 ---
 
@@ -153,6 +150,4 @@ addressed-fastapi/
 5. **Improve Documentation**: Continuously update `README.md`.
 
 ---
-
-
 
