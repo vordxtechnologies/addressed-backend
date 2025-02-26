@@ -15,6 +15,7 @@ lib64/
 parts/
 sdist/
 var/
+uploads/
 wheels/
 *.egg-info/
 .installed.cfg
@@ -37,8 +38,7 @@ env/
 .env.local
 .env.*.local
 
-# Firebase
-addressed-firebase-adminsdk.json
+
 
 # Logs
 *.log

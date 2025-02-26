@@ -1,32 +1,36 @@
 from fastapi import FastAPI
-from app.api import auth, user, ai, data
-from app.core.exceptions import http_exception_handler, validation_exception_handler, generic_exception_handler
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config.settings import get_settings
+from app.api.v1.routes import api_router
+from app.api.v1.security import security_scheme
+
+settings = get_settings()
 
 app = FastAPI(
-    title="Addressed FastAPI Backend",
-    description="API for handling authentication, AI, and data processing",
-    version="1.0.0"
+    title=settings.PROJECT_NAME,
+    description="""
+    Addressed API - Backend service for handling various tools and functionalities.
+    
+    ## Authentication
+    All protected endpoints require a valid Firebase token in the Authorization header:
+    `Authorization: Bearer your-firebase-token`
+    """,
+    version="1.0.0",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url=f"{settings.API_V1_STR}/docs",
+    redoc_url=f"{settings.API_V1_STR}/redoc"
 )
 
-# Include Routes
-app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-app.include_router(user.router, prefix="/user", tags=["User Management"])
-app.include_router(ai.router, prefix="/ai", tags=["AI Processing"])
-app.include_router(data.router, prefix="/data", tags=["Data Processing"])
-# app.include_router(scrape.router, prefix="/scrape", tags=["Web Scraping"])
 
-# Register exception handlers
-app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(Exception, generic_exception_handler)
 
-# Root Route
-@app.get("/")
-def home():
-    return {"message": "FastAPI backend is running"}
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# Include API router with version prefix
+app.include_router(api_router, prefix=settings.API_V1_STR)

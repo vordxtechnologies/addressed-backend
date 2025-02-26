@@ -91,8 +91,8 @@ addressed-fastapi/
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/addressed-fastapi.git
-   cd addressed-fastapi
+   git clone  https://github.com/tlow001/addressed_backend.git
+   cd addressed_backend
    ```
 
 2. Create a virtual environment and activate it:
