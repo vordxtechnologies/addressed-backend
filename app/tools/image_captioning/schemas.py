@@ -1,9 +1,9 @@
 from pydantic import BaseModel
-from typing import Optional
 
 class ImageCaptioningResponse(BaseModel):
-    prompt: str
-    image_path: Optional[str]
+    success: bool
+    caption: str
+    file_path: str
 
 class ErrorResponse(BaseModel):
     error: str

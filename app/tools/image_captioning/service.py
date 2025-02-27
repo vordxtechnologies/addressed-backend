@@ -1,60 +1,109 @@
-import aiohttp
-import aiofiles
-from pathlib import Path
+from app.tools.base.service import BaseToolService
+from app.infrastructure.ai.huggingface.client import HuggingFaceClient
 from fastapi import UploadFile, HTTPException
-import os
-import logging
+from pathlib import Path
+import aiofiles
+import time
+from typing import Dict, Any
 from app.core.config.settings import get_settings
+from app.core.logging.logging_config import logger
 
 settings = get_settings()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+class ImageCaptioningService(BaseToolService):
+    ALLOWED_MIME_TYPES = {'image/jpeg', 'image/png', 'image/jpg', 'image/webp'}
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
-class ImageCaptioningService:
     def __init__(self):
-        self.huggingface_api_url = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large"
-        self.headers = {
-            "Authorization": f"Bearer {settings.HUGGINGFACE_API_KEY}"
-        }
-        logger.info(f"Using Hugging Face API Key: {settings.HUGGINGFACE_API_KEY}")
+        super().__init__()
+        self.hf_client = HuggingFaceClient()
+        self.model_id = "Salesforce/blip-image-captioning-large"
         self.upload_dir = Path(settings.UPLOAD_DIR) / "images"
         self.upload_dir.mkdir(parents=True, exist_ok=True)
 
-    async def save_upload_file(self, file: UploadFile) -> str:
-        """Save uploaded file and return the file path"""
-        file_path = self.upload_dir / file.filename
+    @property
+    def tool_name(self) -> str:
+        return "image_captioning"
+
+    async def execute(self, file: UploadFile) -> Dict[str, Any]:
+        """Execute image captioning on the uploaded file"""
+        try:
+            # Validate file
+            await self._validate_file(file)
+            
+            # Read file content once
+            image_bytes = await file.read()
+            
+            # Generate caption first
+            caption = await self._generate_caption(image_bytes)
+            
+            # Save file after successful caption generation
+            timestamp = int(time.time())
+            unique_filename = f"{timestamp}_{file.filename}"
+            file_path = await self._save_upload_file(unique_filename, image_bytes)
+            
+            return {
+                "success": True,
+                "caption": caption,
+                "file_path": str(file_path)
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Image captioning failed: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=str(e)
+            )
+
+    async def _validate_file(self, file: UploadFile) -> None:
+        """Validate uploaded file"""
+        if not file.content_type in self.ALLOWED_MIME_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type. Allowed types: {', '.join(self.ALLOWED_MIME_TYPES)}"
+            )
+
+        # Check file size
+        file.file.seek(0, 2)
+        size = file.file.tell()
+        file.file.seek(0)
+        
+        if size > self.MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File size too large. Maximum size: {self.MAX_FILE_SIZE/1024/1024}MB"
+            )
+
+    async def _save_upload_file(self, filename: str, content: bytes) -> Path:
+        """Save file content to disk"""
+        file_path = self.upload_dir / filename
         try:
             async with aiofiles.open(file_path, 'wb') as out_file:
-                content = await file.read()
                 await out_file.write(content)
-            logger.info(f"File saved successfully at {file_path}")
-            return str(file_path)
+            return file_path
         except Exception as e:
-            logger.error(f"Failed to save file: {str(e)}")
+            self.logger.error(f"Failed to save file: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to save file")
 
-    async def generate_caption(self, file_path: str) -> str:
-        """Generate caption using HuggingFace API"""
+    async def _generate_caption(self, image_bytes: bytes) -> str:
+        """Generate caption using HuggingFace model"""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with aiofiles.open(file_path, 'rb') as f:
-                    data = await f.read()
-                    async with session.post(
-                        self.huggingface_api_url,
-                        headers=self.headers,
-                        data=data
-                    ) as response:
-                        if response.status != 200:
-                            logger.error(f"Failed to generate caption: {response.status}")
-                            raise HTTPException(
-                                status_code=response.status,
-                                detail="Failed to generate caption"
-                            )
-                        result = await response.json()
-                        logger.info(f"Caption generated successfully for {file_path}")
-                        return result[0].get('generated_text', '')
+            result = await self.hf_client.query_model(self.model_id, image_bytes)
+            
+            if not isinstance(result, list) or not result:
+                raise ValueError("Invalid response from model")
+                
+            caption = result[0].get('generated_text')
+            if not caption:
+                raise ValueError("No caption generated")
+                
+            return caption
+            
         except Exception as e:
-            logger.error(f"Error during caption generation: {str(e)}")
-            raise HTTPException(status_code=500, detail="Failed to generate caption")
+            self.logger.error(f"Caption generation failed: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to generate caption: {str(e)}"
+            )
