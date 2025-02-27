@@ -48,6 +48,7 @@ log/
 # Database
 *.sqlite3
 *.db
+addressed-firebase-adminsdk.json
 
 # Redis
 dump.rdb
